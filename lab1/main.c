@@ -193,4 +193,22 @@ int mygrep_search_in_file(const char *pattern, const char *file_name, int multip
     return 0;
 }
 
+void mygrep_search_in_stdin(const char *pattern) {
+    char *line = NULL;
+    size_t len = 0;
+    regex_t regex;
 
+    if (regcomp(&regex, pattern, REG_EXTENDED)) {
+        fprintf(stderr, "Could not compile regex\n");
+        return;
+    }
+
+    while (getline(&line, &len, stdin) != -1) {
+        if (regexec(&regex, line, 0, NULL, 0) == 0) {
+            printf("%s", line);
+        }
+    }
+
+    regfree(&regex);
+    free(line);
+}
