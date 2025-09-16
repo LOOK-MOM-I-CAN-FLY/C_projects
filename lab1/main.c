@@ -160,3 +160,37 @@ int mygrep_main(int argc, char *argv[]) {
     return exit_status;
 }
 
+int mygrep_search_in_file(const char *pattern, const char *file_name, int multiple_files) {
+    FILE *file = fopen(file_name, "r");
+    if (file == NULL) {
+        perror(file_name);
+        return 1;
+    }
+
+    char *line = NULL;
+    size_t len = 0;
+    regex_t regex;
+
+    if (regcomp(&regex, pattern, REG_EXTENDED)) {
+        fprintf(stderr, "Could not compile regex\n");
+        fclose(file);
+        return 1;
+    }
+
+    while (getline(&line, &len, file) != -1) {
+        if (regexec(&regex, line, 0, NULL, 0) == 0) {
+            if (multiple_files) {
+                printf("%s:%s", file_name, line);
+            } else {
+                printf("%s", line);
+            }
+        }
+    }
+
+    regfree(&regex);
+    free(line);
+    fclose(file);
+    return 0;
+}
+
+
