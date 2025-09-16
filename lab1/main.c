@@ -139,3 +139,24 @@ void mycat_process_stdin(int flags) {
 
     free(line);
 }
+int mygrep_main(int argc, char *argv[]) {
+    if (argc < 2) {
+        fprintf(stderr, "Usage: %s pattern [file...]\n", argv[0]);
+        return 1;
+    }
+
+    const char *pattern = argv[1];
+    int exit_status = 0;
+    int multiple_files = (argc > 3);
+
+    if (argc == 2) {
+        mygrep_search_in_stdin(pattern);
+    } else {
+        for (int i = 2; i < argc; i++) {
+            exit_status |= mygrep_search_in_file(pattern, argv[i], multiple_files);
+        }
+    }
+
+    return exit_status;
+}
+
