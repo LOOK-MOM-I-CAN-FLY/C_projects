@@ -29,3 +29,44 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 }
+int mycat_main(int argc, char *argv[]) {
+    int opt;
+    int flags = NO_FLAGS;
+    int exit_status = 0;
+
+    struct option long_options[] = {
+        {"number", no_argument, 0, 'n'},
+        {"number-nonblank", no_argument, 0, 'b'},
+        {"show-ends", no_argument, 0, 'E'},
+        {0, 0, 0, 0}
+    };
+
+    optind = 1; // Reset getopt
+    while ((opt = getopt_long(argc, argv, "nbE", long_options, NULL)) != -1) {
+        switch (opt) {
+            case 'n':
+                flags |= N_FLAG;
+                break;
+            case 'b':
+                flags |= B_FLAG;
+                break;
+            case 'E':
+                flags |= E_FLAG;
+                break;
+            default:
+                fprintf(stderr, "Usage: %s [-n] [-b] [-E] [file...]\n", argv[0]);
+                return 1;
+        }
+    }
+
+    if (optind == argc) {
+        mycat_process_stdin(flags);
+    } else {
+        for (int i = optind; i < argc; i++) {
+            exit_status |= mycat_process_file(argv[i], flags);
+        }
+    }
+
+    return exit_status;
+}
+
