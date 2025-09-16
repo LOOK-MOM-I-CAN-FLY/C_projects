@@ -70,3 +70,41 @@ int mycat_main(int argc, char *argv[]) {
     return exit_status;
 }
 
+
+int mycat_process_file(const char *file_name, int flags) {
+    FILE *file = fopen(file_name, "r");
+    if (file == NULL) {
+        perror(file_name);
+        return 1;
+    }
+
+    char *line = NULL;
+    size_t len = 0;
+    ssize_t read;
+    int line_number = 1;
+
+    while ((read = getline(&line, &len, file)) != -1) {
+        int is_empty = (strcmp(line, "\n") == 0);
+
+        if ((flags & B_FLAG) && !is_empty) {
+            printf("%6d\t", line_number++);
+        } else if ((flags & N_FLAG) && !(flags & B_FLAG)) {
+            printf("%6d\t", line_number++);
+        }
+
+        if (flags & E_FLAG) {
+            if (line[read - 1] == '\n') {
+                line[read - 1] = '$';
+                printf("%s\n", line);
+            } else {
+                printf("%s$\n", line);
+            }
+        } else {
+            printf("%s", line);
+        }
+    }
+
+    free(line);
+    fclose(file);
+    return 0;
+}
