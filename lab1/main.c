@@ -29,6 +29,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 }
+
 int mycat_main(int argc, char *argv[]) {
     int opt;
     int flags = NO_FLAGS;
@@ -70,7 +71,6 @@ int mycat_main(int argc, char *argv[]) {
     return exit_status;
 }
 
-
 int mycat_process_file(const char *file_name, int flags) {
     FILE *file = fopen(file_name, "r");
     if (file == NULL) {
@@ -84,7 +84,7 @@ int mycat_process_file(const char *file_name, int flags) {
     int line_number = 1;
 
     while ((read = getline(&line, &len, file)) != -1) {
-        int is_empty = (strcmp(line, "\n") == 0);
+        int is_empty = (line[0] == '\n');
 
         if ((flags & B_FLAG) && !is_empty) {
             printf("%6d\t", line_number++);
@@ -109,7 +109,6 @@ int mycat_process_file(const char *file_name, int flags) {
     return 0;
 }
 
-
 void mycat_process_stdin(int flags) {
     char *line = NULL;
     size_t len = 0;
@@ -117,7 +116,7 @@ void mycat_process_stdin(int flags) {
     int line_number = 1;
 
     while ((read = getline(&line, &len, stdin)) != -1) {
-        int is_empty = (strcmp(line, "\n") == 0);
+        int is_empty = (line[0] == '\n');
 
         if ((flags & B_FLAG) && !is_empty) {
             printf("%6d\t", line_number++);
@@ -139,6 +138,8 @@ void mycat_process_stdin(int flags) {
 
     free(line);
 }
+
+
 int mygrep_main(int argc, char *argv[]) {
     if (argc < 2) {
         fprintf(stderr, "Usage: %s pattern [file...]\n", argv[0]);
