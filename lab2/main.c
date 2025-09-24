@@ -48,7 +48,6 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-
 void print_long_format(const char *path, const char *name) {
     struct stat st;
     char full_path[1024];
@@ -59,7 +58,6 @@ void print_long_format(const char *path, const char *name) {
         return;
     }
 
-    // File type and permissions
     printf((S_ISDIR(st.st_mode)) ? "d" : (S_ISLNK(st.st_mode) ? "l" : "-"));
     printf((st.st_mode & S_IRUSR) ? "r" : "-");
     printf((st.st_mode & S_IWUSR) ? "w" : "-");
