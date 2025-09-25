@@ -13,30 +13,34 @@ void print_long_format(const char *path, const char *name);
 void process_path(const char *path, int show_all, int long_format, int multiple_paths);
 
 int main(int argc, char *argv[]) {
-    int opt;
     int show_all = 0;
     int long_format = 0;
-
-    while ((opt = getopt(argc, argv, "la")) != -1) {
-        switch (opt) {
-            case 'l':
+    int first_path_index = 1;
+    for (int i = 1; i < argc; i++) {
+        const char *arg = argv[i];
+        if (arg[0] != '-' || arg[1] == '\0') {
+            first_path_index = i;
+            break;
+        }
+        for (int j = 1; arg[j] != '\0'; j++) {
+            if (arg[j] == 'l') {
                 long_format = 1;
-                break;
-            case 'a':
+            } else if (arg[j] == 'a') {
                 show_all = 1;
-                break;
-            default:
+            } else {
                 fprintf(stderr, "Usage: %s [-la] [file...]\n", argv[0]);
                 exit(1);
+            }
         }
+        first_path_index = i + 1;
     }
 
-    int multiple_paths = (argc - optind) > 1;
+    int multiple_paths = (argc - first_path_index) > 1;
 
-    if (optind == argc) {
+    if (first_path_index >= argc) {
         process_path(".", show_all, long_format, 0);
     } else {
-        for (int i = optind; i < argc; i++) {
+        for (int i = first_path_index; i < argc; i++) {
             process_path(argv[i], show_all, long_format, multiple_paths);
             if (multiple_paths && i < argc - 1) {
                 printf("\n");
