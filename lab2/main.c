@@ -3,7 +3,6 @@
 #include <string.h>
 #include <dirent.h>
 #include <sys/stat.h>
-#include <unistd.h>
 #include <pwd.h>
 #include <grp.h>
 #include <time.h>
