@@ -1,5 +1,3 @@
-#define _DEFAULT_SOURCE
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,14 +11,21 @@
 #include <getopt.h>
 
 #define COLOR_RESET   "\x1b[0m"
-#define COLOR_BLUE    "\x1b[34m"
-#define COLOR_GREEN   "\x1b[32m"
-#define COLOR_CYAN    "\x1b[36m"
+#define COLOR_BLUE    "\x1b[34m" 
+#define COLOR_GREEN   "\x1b[32m" 
+#define COLOR_CYAN    "\x1b[36m" 
+
+typedef struct {
+    char name[256]; 
+    struct stat st; 
+} FileEntry;
 
 void process_path(const char *path, int show_all, int long_format);
-void print_long_format(const char *path, const char *name);
+void print_long_format(const char *path, const FileEntry *entry);
+void print_short_format(const FileEntry *entry);
 void print_file_type(mode_t mode);
 void print_permissions(mode_t mode);
+int compare_entries(const void *a, const void *b);
 
 int main(int argc, char *argv[]) {
     int opt;
@@ -45,6 +50,9 @@ int main(int argc, char *argv[]) {
         process_path(".", show_all, long_format);
     } else {
         for (int i = optind; i < argc; i++) {
+            if (i > optind && argc - optind > 1) {
+                printf("\n");
+            }
             process_path(argv[i], show_all, long_format);
         }
     }
@@ -52,95 +60,111 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
+int compare_entries(const void *a, const void *b) {
+    const FileEntry *entry_a = (const FileEntry *)a;
+    const FileEntry *entry_b = (const FileEntry *)b;
+    return strcmp(entry_a->name, entry_b->name);
+}
+
 void process_path(const char *path, int show_all, int long_format) {
-    struct stat st;
-    if (lstat(path, &st) == -1) {
+    struct stat path_st;
+    if (lstat(path, &path_st) == -1) {
         perror(path);
         return;
     }
-    
-    if (!S_ISDIR(st.st_mode)) {
+
+    if (!S_ISDIR(path_st.st_mode)) {
+        FileEntry entry;
+        strncpy(entry.name, path, sizeof(entry.name) - 1);
+        entry.st = path_st;
+
         if (long_format) {
-            print_long_format(".", path); 
+            print_long_format(path, &entry);
         } else {
-            if (S_ISLNK(st.st_mode)) {
-                printf("%s%s%s\n", COLOR_CYAN, path, COLOR_RESET);
-            } else if (st.st_mode & S_IXUSR) {
-                printf("%s%s%s\n", COLOR_GREEN, path, COLOR_RESET);
-            } else {
-                printf("%s\n", path);
-            }
+            print_short_format(&entry);
+            printf("\n");
         }
         return;
     }
     
-    struct dirent **namelist;
-    int n;
-
-    n = scandir(path, &namelist, NULL, alphasort);
-    if (n < 0) {
-        perror("scandir");
+    DIR *dir = opendir(path);
+    if (dir == NULL) {
+        perror(path);
         return;
     }
 
-    for (int i = 0; i < n; i++) {
-        if (!show_all && namelist[i]->d_name[0] == '.') {
-            free(namelist[i]);
+    FileEntry *entries = NULL;
+    int count = 0;
+    struct dirent *dirent_p;
+
+    while ((dirent_p = readdir(dir)) != NULL) {
+        if (!show_all && dirent_p->d_name[0] == '.') {
             continue;
         }
 
-        char fullpath[1024];
-        snprintf(fullpath, sizeof(fullpath), "%s/%s", path, namelist[i]->d_name);
-
-        if (long_format) {
-            print_long_format(fullpath, namelist[i]->d_name);
-        } else {
-            struct stat sb;
-            if (lstat(fullpath, &sb) == -1) {
-                perror("lstat");
-                free(namelist[i]);
-                continue;
-            }
-
-            if (S_ISDIR(sb.st_mode)) {
-                printf("%s%s%s  ", COLOR_BLUE, namelist[i]->d_name, COLOR_RESET);
-            } else if (S_ISLNK(sb.st_mode)) {
-                printf("%s%s%s  ", COLOR_CYAN, namelist[i]->d_name, COLOR_RESET);
-            } else if (sb.st_mode & S_IXUSR) {
-                printf("%s%s%s  ", COLOR_GREEN, namelist[i]->d_name, COLOR_RESET);
-            } else {
-                printf("%s  ", namelist[i]->d_name);
-            }
+        entries = realloc(entries, (count + 1) * sizeof(FileEntry));
+        if (entries == NULL) {
+            perror("realloc");
+            closedir(dir);
+            exit(EXIT_FAILURE);
         }
-        free(namelist[i]);
+
+        FileEntry *current_entry = &entries[count];
+        strncpy(current_entry->name, dirent_p->d_name, sizeof(current_entry->name) - 1);
+        
+        char fullpath[1024];
+        snprintf(fullpath, sizeof(fullpath), "%s/%s", path, dirent_p->d_name);
+
+        if (lstat(fullpath, &current_entry->st) == -1) {
+            perror(fullpath);
+            continue; 
+        }
+        count++;
+    }
+    closedir(dir);
+
+    qsort(entries, count, sizeof(FileEntry), compare_entries);
+
+    for (int i = 0; i < count; i++) {
+        char fullpath[1024];
+        snprintf(fullpath, sizeof(fullpath), "%s/%s", path, entries[i].name);
+        if (long_format) {
+            print_long_format(fullpath, &entries[i]);
+        } else {
+            print_short_format(&entries[i]);
+        }
     }
 
-    if (!long_format) {
+    if (!long_format && count > 0) {
         printf("\n");
     }
 
-    free(namelist);
+    free(entries); 
 }
 
-void print_long_format(const char *path, const char *name) {
-    struct stat sb;
+void print_short_format(const FileEntry *entry) {
+    mode_t mode = entry->st.st_mode;
+    const char *name = entry->name;
 
-    const char *path_to_stat = path;
-    struct stat path_stat;
+    if (S_ISDIR(mode)) {
+        printf("%s%s%s  ", COLOR_BLUE, name, COLOR_RESET);
+    } else if (S_ISLNK(mode)) {
+        printf("%s%s%s  ", COLOR_CYAN, name, COLOR_RESET);
+    } else if (mode & (S_IXUSR | S_IXGRP | S_IXOTH)) { 
+        printf("%s%s%s  ", COLOR_GREEN, name, COLOR_RESET);
+    } else {
+        printf("%s  ", name);
+    }
+}
+
+void print_long_format(const char *path, const FileEntry *entry) {
+    struct stat sb = entry->st;
+    const char *name = entry->name;
     
-    if (lstat(path, &path_stat) != 0) {
-        path_to_stat = name;
-    }
-
-
-    if (lstat(path_to_stat, &sb) == -1) {
-        perror(path_to_stat);
-        return;
-    }
-
     print_file_type(sb.st_mode);
     print_permissions(sb.st_mode);
-    printf(" %2lu", sb.st_nlink);
+
+    printf(" %2lu", (unsigned long)sb.st_nlink);
 
     struct passwd *pw = getpwuid(sb.st_uid);
     struct group *gr = getgrgid(sb.st_gid);
@@ -156,14 +180,14 @@ void print_long_format(const char *path, const char *name) {
         printf("%s%s%s", COLOR_BLUE, name, COLOR_RESET);
     } else if (S_ISLNK(sb.st_mode)) {
         char link_target[1024];
-        ssize_t len = readlink(path_to_stat, link_target, sizeof(link_target) - 1);
+        ssize_t len = readlink(path, link_target, sizeof(link_target) - 1);
         if (len != -1) {
             link_target[len] = '\0';
             printf("%s%s%s -> %s", COLOR_CYAN, name, COLOR_RESET, link_target);
         } else {
             printf("%s%s%s", COLOR_CYAN, name, COLOR_RESET);
         }
-    } else if (sb.st_mode & S_IXUSR) {
+    } else if (sb.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) {
         printf("%s%s%s", COLOR_GREEN, name, COLOR_RESET);
     } else {
         printf("%s", name);
