@@ -1,3 +1,4 @@
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,15 +11,18 @@
 #include <time.h>
 #include <getopt.h>
 
+
 #define COLOR_RESET   "\x1b[0m"
 #define COLOR_BLUE    "\x1b[34m" 
 #define COLOR_GREEN   "\x1b[32m" 
 #define COLOR_CYAN    "\x1b[36m" 
 
+
 typedef struct {
     char name[256]; 
     struct stat st; 
 } FileEntry;
+
 
 void process_path(const char *path, int show_all, int long_format);
 void print_long_format(const char *path, const FileEntry *entry);
@@ -50,6 +54,7 @@ int main(int argc, char *argv[]) {
         process_path(".", show_all, long_format);
     } else {
         for (int i = optind; i < argc; i++) {
+            
             if (i > optind && argc - optind > 1) {
                 printf("\n");
             }
@@ -59,6 +64,7 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
+
 
 int compare_entries(const void *a, const void *b) {
     const FileEntry *entry_a = (const FileEntry *)a;
@@ -73,6 +79,7 @@ void process_path(const char *path, int show_all, int long_format) {
         return;
     }
 
+    
     if (!S_ISDIR(path_st.st_mode)) {
         FileEntry entry;
         strncpy(entry.name, path, sizeof(entry.name) - 1);
@@ -87,6 +94,9 @@ void process_path(const char *path, int show_all, int long_format) {
         return;
     }
     
+    
+    
+    
     DIR *dir = opendir(path);
     if (dir == NULL) {
         perror(path);
@@ -97,11 +107,13 @@ void process_path(const char *path, int show_all, int long_format) {
     int count = 0;
     struct dirent *dirent_p;
 
+    
     while ((dirent_p = readdir(dir)) != NULL) {
         if (!show_all && dirent_p->d_name[0] == '.') {
             continue;
         }
 
+        
         entries = realloc(entries, (count + 1) * sizeof(FileEntry));
         if (entries == NULL) {
             perror("realloc");
@@ -109,6 +121,7 @@ void process_path(const char *path, int show_all, int long_format) {
             exit(EXIT_FAILURE);
         }
 
+        
         FileEntry *current_entry = &entries[count];
         strncpy(current_entry->name, dirent_p->d_name, sizeof(current_entry->name) - 1);
         
@@ -117,14 +130,17 @@ void process_path(const char *path, int show_all, int long_format) {
 
         if (lstat(fullpath, &current_entry->st) == -1) {
             perror(fullpath);
+            
             continue; 
         }
         count++;
     }
     closedir(dir);
 
+    
     qsort(entries, count, sizeof(FileEntry), compare_entries);
 
+    
     for (int i = 0; i < count; i++) {
         char fullpath[1024];
         snprintf(fullpath, sizeof(fullpath), "%s/%s", path, entries[i].name);
@@ -164,6 +180,7 @@ void print_long_format(const char *path, const FileEntry *entry) {
     print_file_type(sb.st_mode);
     print_permissions(sb.st_mode);
 
+    
     printf(" %2lu", (unsigned long)sb.st_nlink);
 
     struct passwd *pw = getpwuid(sb.st_uid);
@@ -176,6 +193,7 @@ void print_long_format(const char *path, const FileEntry *entry) {
     strftime(time_buf, sizeof(time_buf), "%b %d %H:%M", localtime(&sb.st_mtime));
     printf(" %s ", time_buf);
 
+    
     if (S_ISDIR(sb.st_mode)) {
         printf("%s%s%s", COLOR_BLUE, name, COLOR_RESET);
     } else if (S_ISLNK(sb.st_mode)) {
