@@ -1,6 +1,6 @@
 TARGET = mychmod
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c99 -o
+CFLAGS = -Wall -Wextra -o
 SRCS = main.c
 all: $(TARGET)
 $(TARGET): $(SRCS)
