@@ -141,6 +141,14 @@ void process_path(const char *path, int show_all, int long_format) {
     qsort(entries, count, sizeof(FileEntry), compare_entries);
 
     
+    if (long_format) {
+        long long total_blocks = 0;
+        for (int i = 0; i < count; i++) {
+            total_blocks += (long long)entries[i].st.st_blocks;
+        }
+        printf("итого %lld\n", total_blocks);
+    }
+
     for (int i = 0; i < count; i++) {
         char fullpath[1024];
         snprintf(fullpath, sizeof(fullpath), "%s/%s", path, entries[i].name);
@@ -185,7 +193,11 @@ void print_long_format(const char *path, const FileEntry *entry) {
 
     struct passwd *pw = getpwuid(sb.st_uid);
     struct group *gr = getgrgid(sb.st_gid);
-    printf(" %-8s %-8s", pw ? pw->pw_name : "uid", gr ? gr->gr_name : "gruid");
+    char uid_buf[32];
+    char gid_buf[32];
+    snprintf(uid_buf, sizeof(uid_buf), "%lu", (unsigned long)sb.st_uid);
+    snprintf(gid_buf, sizeof(gid_buf), "%lu", (unsigned long)sb.st_gid);
+    printf(" %-8s %-8s", pw ? pw->pw_name : uid_buf, gr ? gr->gr_name : gid_buf);
 
     printf(" %7lld", (long long)sb.st_size);
 
