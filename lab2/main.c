@@ -185,7 +185,7 @@ void print_long_format(const char *path, const FileEntry *entry) {
 
     struct passwd *pw = getpwuid(sb.st_uid);
     struct group *gr = getgrgid(sb.st_gid);
-    printf(" %-8s %-8s", pw ? pw->pw_name : "unknown", gr ? gr->gr_name : "unknown");
+    printf(" %-8s %-8s", pw ? pw->pw_name : "uid", gr ? gr->gr_name : "gruid");
 
     printf(" %7lld", (long long)sb.st_size);
 
