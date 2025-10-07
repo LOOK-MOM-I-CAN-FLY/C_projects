@@ -20,7 +20,7 @@ int parse_octal_mode(const char *mode_str, mode_t *new_mode) {
     if (strlen(mode_str) > 4) {
         return -1;
     }
-    for (int i = 0; i < strlen(mode_str); ++i) {
+    for (size_t i = 0; i < strlen(mode_str); ++i) {
         if (mode_str[i] < '0' || mode_str[i] > '7') {
             return -1;
         }
@@ -30,52 +30,70 @@ int parse_octal_mode(const char *mode_str, mode_t *new_mode) {
 }
 
 int parse_symbolic_mode(const char *mode_str, mode_t current_mode, mode_t *new_mode) {
-    const char *p = mode_str;
-    mode_t who = 0;
-    char op = 0;
-    mode_t perms = 0;
-    while (*p && strchr("ugoa", *p)) {
-        switch (*p) {
-            case 'u': who |= S_IRWXU; break;
-            case 'g': who |= S_IRWXG; break;
-            case 'o': who |= S_IRWXO; break;
-            case 'a': who = S_IRWXU | S_IRWXG | S_IRWXO; break;
-        }
-        p++;
-    }
-    if (who == 0) {
-        mode_t mask = umask(0);
-        umask(mask);
-        who = ~mask;
-    }
-    if (*p == '+' || *p == '-' || *p == '=') {
-        op = *p;
-        p++;
-    } else {
+    *new_mode = current_mode;
+    char *mode_copy = strdup(mode_str);
+    if (mode_copy == NULL) {
         return -1;
     }
-    while (*p) {
-        switch (*p) {
-            case 'r': perms |= S_IRUSR | S_IRGRP | S_IROTH; break;
-            case 'w': perms |= S_IWUSR | S_IWGRP | S_IWOTH; break;
-            case 'x': perms |= S_IXUSR | S_IXGRP | S_IXOTH; break;
-            default: return -1;
+
+    char *p = strtok(mode_copy, ",");
+    while (p != NULL) {
+        mode_t who = 0;
+        char op = 0;
+        mode_t perms = 0;
+
+        const char *temp_p = p;
+        while (*temp_p && strchr("ugoa", *temp_p)) {
+            switch (*temp_p) {
+                case 'u': who |= S_IRWXU; break;
+                case 'g': who |= S_IRWXG; break;
+                case 'o': who |= S_IRWXO; break;
+                case 'a': who = S_IRWXU | S_IRWXG | S_IRWXO; break;
+            }
+            temp_p++;
         }
-        p++;
+
+        if (who == 0) {
+            mode_t mask = umask(0);
+            umask(mask);
+            who = ~mask;
+        }
+
+        if (*temp_p == '+' || *temp_p == '-' || *temp_p == '=') {
+            op = *temp_p;
+            temp_p++;
+        } else {
+            free(mode_copy);
+            return -1;
+        }
+
+        while (*temp_p) {
+            switch (*temp_p) {
+                case 'r': perms |= S_IRUSR | S_IRGRP | S_IROTH; break;
+                case 'w': perms |= S_IWUSR | S_IWGRP | S_IWOTH; break;
+                case 'x': perms |= S_IXUSR | S_IXGRP | S_IXOTH; break;
+                default: free(mode_copy); return -1;
+            }
+            temp_p++;
+        }
+
+        perms &= who;
+
+        switch (op) {
+            case '+':
+                *new_mode |= perms;
+                break;
+            case '-':
+                *new_mode &= ~perms;
+                break;
+            case '=':
+                *new_mode = (*new_mode & ~who) | perms;
+                break;
+        }
+        p = strtok(NULL, ",");
     }
-    perms &= who;
-    *new_mode = current_mode;
-    switch (op) {
-        case '+':
-            *new_mode |= perms;
-            break;
-        case '-':
-            *new_mode &= ~perms;
-            break;
-        case '=':
-             *new_mode = (*new_mode & ~who) | perms;
-            break;
-    }
+
+    free(mode_copy);
     return 0;
 }
 
