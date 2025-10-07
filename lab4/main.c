@@ -4,103 +4,53 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <errno.h>
+#include <sys/types.h>
+
+void error_exit(const char *message) {
+    perror(message);
+    exit(EXIT_FAILURE);
+}
 
 void print_usage(const char *prog_name) {
     fprintf(stderr, "Usage: %s <mode> <file>\n", prog_name);
     fprintf(stderr, "Examples:\n");
     fprintf(stderr, "  %s +x file.txt\n", prog_name);
     fprintf(stderr, "  %s u-r file.txt\n", prog_name);
-    fprintf(stderr, "  %s g+rw file.txt\n", prog_name);
-    fprintf(stderr, "  %s ug+rw file.txt\n", prog_name);
-    fprintf(stderr, "  %s a+rwx file.txt\n", prog_name);
-    fprintf(stderr, "  %s 766 file.txt\n", prog_name);
+    fprintf(stderr, "  %s ug+rw,o-r file.txt\n", prog_name);
+    fprintf(stderr, "  %s a=rwx file.txt\n", prog_name);
+    fprintf(stderr, "  %s 755 file.txt\n", prog_name);
 }
 
-int parse_octal_mode(const char *mode_str, mode_t *new_mode) {
-    if (strlen(mode_str) > 4) {
+int handle_octal_mode(const char *mode_str, mode_t *new_mode) {
+    char *endptr;
+    long mode_val = strtol(mode_str, &endptr, 8);
+
+    if (*endptr != '\0' || mode_val < 0 || mode_val > 07777) {
+        fprintf(stderr, "Invalid octal mode: %s\n", mode_str);
         return -1;
     }
-    for (size_t i = 0; i < strlen(mode_str); ++i) {
-        if (mode_str[i] < '0' || mode_str[i] > '7') {
-            return -1;
-        }
-    }
-    *new_mode = strtol(mode_str, NULL, 8);
+    *new_mode = (mode_t)mode_val;
     return 0;
 }
 
-int parse_symbolic_mode(const char *mode_str, mode_t current_mode, mode_t *new_mode) {
-    *new_mode = current_mode;
-    char *mode_copy = strdup(mode_str);
-    if (mode_copy == NULL) {
+int handle_symbolic_mode(const char *mode_str, mode_t current_mode, mode_t *new_mode) {
+    void *set = setmode(mode_str);
+    if (set == NULL) {
+        fprintf(stderr, "Invalid symbolic mode: %s\n", mode_str);
         return -1;
     }
-
-    char *p = strtok(mode_copy, ",");
-    while (p != NULL) {
-        mode_t who = 0;
-        char op = 0;
-        mode_t perms = 0;
-
-        const char *temp_p = p;
-        while (*temp_p && strchr("ugoa", *temp_p)) {
-            switch (*temp_p) {
-                case 'u': who |= S_IRWXU; break;
-                case 'g': who |= S_IRWXG; break;
-                case 'o': who |= S_IRWXO; break;
-                case 'a': who = S_IRWXU | S_IRWXG | S_IRWXO; break;
-            }
-            temp_p++;
-        }
-
-        if (who == 0) {
-            mode_t mask = umask(0);
-            umask(mask);
-            who = ~mask;
-        }
-
-        if (*temp_p == '+' || *temp_p == '-' || *temp_p == '=') {
-            op = *temp_p;
-            temp_p++;
-        } else {
-            free(mode_copy);
-            return -1;
-        }
-
-        while (*temp_p) {
-            switch (*temp_p) {
-                case 'r': perms |= S_IRUSR | S_IRGRP | S_IROTH; break;
-                case 'w': perms |= S_IWUSR | S_IWGRP | S_IWOTH; break;
-                case 'x': perms |= S_IXUSR | S_IXGRP | S_IXOTH; break;
-                default: free(mode_copy); return -1;
-            }
-            temp_p++;
-        }
-
-        perms &= who;
-
-        switch (op) {
-            case '+':
-                *new_mode |= perms;
-                break;
-            case '-':
-                *new_mode &= ~perms;
-                break;
-            case '=':
-                *new_mode = (*new_mode & ~who) | perms;
-                break;
-        }
-        p = strtok(NULL, ",");
-    }
-
-    free(mode_copy);
+    mode_t result = getmode(set, current_mode);
+    free(set);
+    *new_mode = result;
     return 0;
 }
+
 
 int main(int argc, char *argv[]) {
     if (argc != 3) {
         print_usage(argv[0]);
-        return 1;
+        return EXIT_FAILURE;
     }
 
     const char *mode_str = argv[1];
@@ -108,27 +58,32 @@ int main(int argc, char *argv[]) {
 
     struct stat file_stat;
     if (stat(file_path, &file_stat) != 0) {
-        perror("Failed to get file info");
-        return 1;
+        error_exit("Failed to get file info");
     }
 
     mode_t new_mode;
-    if (isdigit(mode_str[0])) {
-        if (parse_octal_mode(mode_str, &new_mode) != 0) {
-            fprintf(stderr, "Invalid octal mode: %s\n", mode_str);
-            return 1;
+    int is_octal = 1;
+    for (const char *p = mode_str; *p; ++p) {
+        if (!isdigit(*p)) {
+            is_octal = 0;
+            break;
         }
+    }
+    
+    int result;
+    if (is_octal) {
+        result = handle_octal_mode(mode_str, &new_mode);
     } else {
-        if (parse_symbolic_mode(mode_str, file_stat.st_mode, &new_mode) != 0) {
-            fprintf(stderr, "Invalid symbolic mode: %s\n", mode_str);
-            return 1;
-        }
+        result = handle_symbolic_mode(mode_str, file_stat.st_mode, &new_mode);
+    }
+    
+    if (result != 0) {
+        return EXIT_FAILURE;
     }
 
     if (chmod(file_path, new_mode) != 0) {
-        perror("Failed to change file mode");
-        return 1;
+        error_exit("Failed to change file mode");
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
