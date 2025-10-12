@@ -11,10 +11,10 @@
 struct file_header {
     char name[256];
     struct stat metadata;
-    char is_deleted; 
+    char is_deleted;
 };
 
-
+#define MAX_FILE_SIZE (1024 * 1024 * 1024)
 void print_help() {
     printf("Использование: ./archiver arch_name [ключ] [файл]\n");
     printf("Ключи:\n");
@@ -23,7 +23,6 @@ void print_help() {
     printf("  -s, --stat            Показать содержимое архива\n");
     printf("  -h, --help            Показать эту справку\n");
 }
-
 void archive_file(const char *archive_name, const char *file_name) {
     int arch_fd = open(archive_name, O_WRONLY | O_CREAT | O_APPEND, 0666);
     if (arch_fd == -1) {
@@ -39,6 +38,14 @@ void archive_file(const char *archive_name, const char *file_name) {
     }
 
     struct file_header header;
+    
+    if (strlen(file_name) >= sizeof(header.name)) {
+        printf("Ошибка: имя файла '%s' слишком длинное (максимум %zu символов)\n", 
+               file_name, sizeof(header.name) - 1);
+        close(in_fd);
+        close(arch_fd);
+        return;
+    }
     memset(&header, 0, sizeof(header));
     strncpy(header.name, file_name, sizeof(header.name) - 1);
 
@@ -50,12 +57,30 @@ void archive_file(const char *archive_name, const char *file_name) {
     }
     header.is_deleted = 0;
 
-    write(arch_fd, &header, sizeof(header));
+    if (write(arch_fd, &header, sizeof(header)) != sizeof(header)) {
+        perror("Ошибка записи заголовка в архив");
+        close(in_fd);
+        close(arch_fd);
+        return;
+    }
 
     char buffer[4096];
-    ssize_t bytes_read;
+    ssize_t bytes_read, bytes_written;
     while ((bytes_read = read(in_fd, buffer, sizeof(buffer))) > 0) {
-        write(arch_fd, buffer, bytes_read);
+        bytes_written = write(arch_fd, buffer, bytes_read);
+        if (bytes_written != bytes_read) {
+            perror("Ошибка записи данных в архив");
+            close(in_fd);
+            close(arch_fd);
+            return;
+        }
+    }
+    
+    if (bytes_read == -1) {
+        perror("Ошибка чтения исходного файла");
+        close(in_fd);
+        close(arch_fd);
+        return;
     }
 
     printf("Файл '%s' успешно добавлен в архив '%s'.\n", file_name, archive_name);
@@ -63,7 +88,6 @@ void archive_file(const char *archive_name, const char *file_name) {
     close(in_fd);
     close(arch_fd);
 }
-
 void extract_file(const char *archive_name, const char *file_name) {
     int arch_fd = open(archive_name, O_RDWR);
     if (arch_fd == -1) {
@@ -85,29 +109,65 @@ void extract_file(const char *archive_name, const char *file_name) {
                 break;
             }
 
-            char *buffer = malloc(header.metadata.st_size);
-            if (!buffer) {
-                 perror("Ошибка выделения памяти");
-                 close(out_fd);
-                 break;
+            if (header.metadata.st_size > MAX_FILE_SIZE) {
+                printf("Файл '%s' слишком большой для извлечения (размер: %lld байт)\n", 
+                       file_name, (long long)header.metadata.st_size);
+                close(out_fd);
+                break;
+            }
+            char buffer[4096];
+            off_t remaining = header.metadata.st_size;
+            ssize_t bytes_read, bytes_written;
+            
+            while (remaining > 0) {
+                size_t to_read = (remaining > (off_t)sizeof(buffer)) ? sizeof(buffer) : (size_t)remaining;
+                bytes_read = read(arch_fd, buffer, to_read);
+                
+                if (bytes_read <= 0) {
+                    if (bytes_read == -1) perror("Ошибка чтения из архива");
+                    close(out_fd);
+                    break;
+                }
+                
+                bytes_written = write(out_fd, buffer, bytes_read);
+                if (bytes_written != bytes_read) {
+                    perror("Ошибка записи извлеченного файла");
+                    close(out_fd);
+                    break;
+                }
+                
+                remaining -= bytes_read;
             }
             
-            read(arch_fd, buffer, header.metadata.st_size);
-            write(out_fd, buffer, header.metadata.st_size);
+            if (remaining == 0) {
+                close(out_fd);
+            }
             
-            free(buffer);
-            close(out_fd);
+            if (remaining == 0) {
+                if (chmod(header.name, header.metadata.st_mode) == -1) {
+                    perror("Предупреждение: не удалось восстановить права доступа");
+                }
+                chown(header.name, header.metadata.st_uid, header.metadata.st_gid);
+                
+                struct utimbuf times = {header.metadata.st_atime, header.metadata.st_mtime};
+                if (utime(header.name, &times) == -1) {
+                    perror("Предупреждение: не удалось восстановить время модификации");
+                }
+            }
+            if (remaining == 0) {
+                header.is_deleted = 1;
+                if (lseek(arch_fd, header_pos, SEEK_SET) == -1) {
+                    perror("Ошибка позиционирования в архиве");
+                } else if (write(arch_fd, &header, sizeof(header)) != sizeof(header)) {
+                    perror("Ошибка пометки файла как удаленного");
+                }
+            }
             
-            chmod(header.name, header.metadata.st_mode);
-            chown(header.name, header.metadata.st_uid, header.metadata.st_gid);
-            struct utimbuf times = {header.metadata.st_atime, header.metadata.st_mtime};
-            utime(header.name, &times);
-
-            header.is_deleted = 1;
-            lseek(arch_fd, header_pos, SEEK_SET);
-            write(arch_fd, &header, sizeof(header));
-            
-            printf("Файл '%s' извлечен и помечен как удаленный в архиве.\n", file_name);
+            if (remaining == 0) {
+                printf("Файл '%s' извлечен и помечен как удаленный в архиве.\n", file_name);
+            } else {
+                printf("Ошибка при извлечении файла '%s'.\n", file_name);
+            }
             break;
         } else {
             lseek(arch_fd, header.metadata.st_size, SEEK_CUR);
@@ -121,7 +181,6 @@ void extract_file(const char *archive_name, const char *file_name) {
 
     close(arch_fd);
 }
-
 void show_stat(const char *archive_name) {
     int arch_fd = open(archive_name, O_RDONLY);
     if (arch_fd == -1) {
@@ -142,7 +201,10 @@ void show_stat(const char *archive_name) {
             strftime(time_buf, sizeof(time_buf), "%Y-%m-%d %H:%M:%S", localtime(&header.metadata.st_mtime));
             printf("%-30s %-10lld %-20s\n", header.name, (long long)header.metadata.st_size, time_buf);
         }
-        lseek(arch_fd, header.metadata.st_size, SEEK_CUR);
+        if (lseek(arch_fd, header.metadata.st_size, SEEK_CUR) == -1) {
+            perror("Ошибка позиционирования в архиве при просмотре");
+            break;
+        }
     }
 
     close(arch_fd);
@@ -159,7 +221,7 @@ int main(int argc, char *argv[]) {
         print_help();
         return 0;
     }
-
+    
     if (argc < 3) {
         print_help();
         return 1;
@@ -178,7 +240,6 @@ int main(int argc, char *argv[]) {
     optind = 2;
     int opt;
     int option_index = 0;
-    
     opt = getopt_long(argc, argv, "i:e:sh", long_options, &option_index);
 
     switch (opt) {
