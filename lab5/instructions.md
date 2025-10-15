@@ -308,15 +308,86 @@ echo "Another test" > test2.txt
 ./archiver test_archive -s
 ./archiver test_archive -e test1.txt
 ```
+### Блок-схема алгоритма архиватора
+```mermaid
+```mermaid
+flowchart TD
+    Start([Старт])
+    Start --> ArgsCheck{Аргументов меньше 2?}
+    ArgsCheck -- Да --> PrintHelp["print_help(): Печать справки и выход"]
+    ArgsCheck -- Нет --> HelpCmd{Первый аргумент -h или --help?}
+    HelpCmd -- Да --> PrintHelp
+    HelpCmd -- Нет --> Args3Check{Аргументов меньше 3?}
+    Args3Check -- Да --> PrintHelp
+    Args3Check -- Нет --> SetArchive["archive_name = argv[1]"]
+    SetArchive --> ParseOptions["optind = 2, вызов getopt_long"]
+    ParseOptions --> OptSwitch{Опция opt}
+    OptSwitch -->|i| ArchiveCall["archive_file(...)"]
+    OptSwitch -->|e| ExtractCall["extract_file(...)"]
+    OptSwitch -->|s| StatCall["show_stat(...)"]
+    OptSwitch -->|h| PrintHelp
+    OptSwitch -->|ошибка| PrintHelp
 
-## Лицензия
+    %% Подграф для archive_file
+    subgraph ARCHIVE_FILE [Функция archive_file]
+        A1[Открыть или создать архив WR_APPEND] --> A2{Успех?}
+        A2 -- Нет --> A_err_arch["Ошибка открытия архива"]
+        A2 -- Да --> A3[Открыть входной файл RDONLY]
+        A3 --> A4{Успех?}
+        A4 -- Нет --> A_err_in["Ошибка открытия входного файла"]
+        A4 -- Да --> A5[Создать структуру file_header]
+        A5 --> A6[Записать заголовок в архив]
+        A6 --> A7[Читать и записывать данные в архив]
+        A7 --> A8{Ошибка чтения или записи?}
+        A8 -- Да --> A_err_rw["Ошибка ввода-вывода"]
+        A8 -- Нет --> A9[Закрыть файлы и вывести сообщение об успехе]
+    end
 
-Этот проект создан в учебных целях для курса "Операционные системы".
+    %% Подграф для extract_file
+    subgraph EXTRACT_FILE [Функция extract_file]
+        E1[Открыть архив RDWR] --> E2{Успех?}
+        E2 -- Нет --> E_err_open["Ошибка открытия архива"]
+        E2 -- Да --> E3[Читать заголовки файлов]
+        E3 --> E4{Имя совпадает и не удален?}
+        E4 -- Нет --> E_skip["Пропустить данные через lseek"]
+        E4 -- Да --> E5[Создать выходной файл для записи]
+        E5 --> E6{Размер больше MAX_FILE_SIZE?}
+        E6 -- Да --> E_big["Файл слишком большой"]
+        E6 -- Нет --> E7[Копировать данные из архива в файл]
+        E7 --> E8{Ошибка чтения или записи?}
+        E8 -- Да --> E_err_rw2["Ошибка ввода-вывода при копировании"]
+        E8 -- Нет --> E9[Восстановить права, владельца и время]
+        E9 --> E10[Пометить файл как удаленный в архиве]
+        E10 --> E11[Сообщить об успешном извлечении]
+    end
 
-## Автор
+    %% Подграф для show_stat
+    subgraph SHOW_STAT [Функция show_stat]
+        S1[Открыть архив RDONLY] --> S2{Успех?}
+        S2 -- Нет --> S_err_open["Ошибка открытия архива"]
+        S2 -- Да --> S3[Вывести заголовки таблицы]
+        S3 --> S4[Читать заголовки файлов]
+        S4 --> S5{Файл не удален?}
+        S5 -- Да --> S_print["Вывести имя, размер и время"]
+        S5 -- Нет --> S_skip["Пропустить данные lseek"]
+        S_print --> S_skip
+        S_skip --> S4
+    end
 
-Разработано для DefOS Lab 5.
+    %% Завершение
+    ArchiveCall --> End([Завершение])
+    ExtractCall --> End
+    StatCall --> End
+    PrintHelp --> End
+    A_err_arch --> End
+    A_err_in --> End
+    A_err_rw --> End
+    E_err_open --> End
+    E_big --> End
+    E_err_rw2 --> End
+    S_err_open --> End
 
----
+```
 
-**Примечание**: Данный архиватор предназначен для учебных целей и не рекомендуется для использования в продакшене. Для серьезных задач архивирования используйте специализированные инструменты (tar, zip, 7z).
+
+```
