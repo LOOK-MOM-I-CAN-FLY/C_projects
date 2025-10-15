@@ -310,7 +310,6 @@ echo "Another test" > test2.txt
 ```
 ### Блок-схема алгоритма архиватора
 ```mermaid
-```mermaid
 flowchart TD
     Start([Старт])
     Start --> ArgsCheck{Аргументов меньше 2?}
@@ -328,7 +327,6 @@ flowchart TD
     OptSwitch -->|h| PrintHelp
     OptSwitch -->|ошибка| PrintHelp
 
-    %% Подграф для archive_file
     subgraph ARCHIVE_FILE [Функция archive_file]
         A1[Открыть или создать архив WR_APPEND] --> A2{Успех?}
         A2 -- Нет --> A_err_arch["Ошибка открытия архива"]
@@ -343,7 +341,6 @@ flowchart TD
         A8 -- Нет --> A9[Закрыть файлы и вывести сообщение об успехе]
     end
 
-    %% Подграф для extract_file
     subgraph EXTRACT_FILE [Функция extract_file]
         E1[Открыть архив RDWR] --> E2{Успех?}
         E2 -- Нет --> E_err_open["Ошибка открытия архива"]
@@ -361,7 +358,6 @@ flowchart TD
         E10 --> E11[Сообщить об успешном извлечении]
     end
 
-    %% Подграф для show_stat
     subgraph SHOW_STAT [Функция show_stat]
         S1[Открыть архив RDONLY] --> S2{Успех?}
         S2 -- Нет --> S_err_open["Ошибка открытия архива"]
@@ -374,7 +370,6 @@ flowchart TD
         S_skip --> S4
     end
 
-    %% Завершение
     ArchiveCall --> End([Завершение])
     ExtractCall --> End
     StatCall --> End
@@ -386,8 +381,8 @@ flowchart TD
     E_big --> End
     E_err_rw2 --> End
     S_err_open --> End
-
 ```
+
 
 
 ```
