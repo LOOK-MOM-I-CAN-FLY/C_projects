@@ -249,15 +249,23 @@ static void cleanup_and_exit(int code) {
             printf("Writer: shm_unlink(%s) succeeded.\n", SHM_NAME);
         }
     }
+    
     if (g_lockfd >= 0) {
-
         flock(g_lockfd, LOCK_UN);
         close(g_lockfd);
         g_lockfd = -1;
-
+        if (g_is_writer) {
+            if (unlink(LOCKFILE_PATH) != 0 && errno != ENOENT) {
+                fprintf(stderr, "Warning: unlink(%s) failed: %s\n", LOCKFILE_PATH, strerror(errno));
+            } else {
+                printf("Writer: removed lockfile %s\n", LOCKFILE_PATH);
+            }
+        }
     }
+
     exit(code);
 }
+
 
 static void signal_handler(int sig) {
     if (sig == SIGINT || sig == SIGTERM) {
