@@ -230,41 +230,63 @@ static int run_reader(void) {
 }
 
 static void cleanup_and_exit(int code) {
-
     if (g_shm_ptr && g_shm_ptr != MAP_FAILED) {
         munmap((void*)g_shm_ptr, SHM_SIZE);
         g_shm_ptr = NULL;
     }
+
     if (g_shm_fd >= 0) {
         close(g_shm_fd);
         g_shm_fd = -1;
     }
     if (g_is_writer) {
-
         if (shm_unlink(SHM_NAME) != 0) {
             if (errno != ENOENT) {
-                fprintf(stderr, "Warning: shm_unlink failed: %s\n", strerror(errno));
+                fprintf(stderr, "Warning: shm_unlink(%s) failed: %s\n", SHM_NAME, strerror(errno));
             }
         } else {
             printf("Writer: shm_unlink(%s) succeeded.\n", SHM_NAME);
         }
     }
-    
+
     if (g_lockfd >= 0) {
-        flock(g_lockfd, LOCK_UN);
-        close(g_lockfd);
-        g_lockfd = -1;
-        if (g_is_writer) {
-            if (unlink(LOCKFILE_PATH) != 0 && errno != ENOENT) {
-                fprintf(stderr, "Warning: unlink(%s) failed: %s\n", LOCKFILE_PATH, strerror(errno));
+        pid_t file_pid = -1;
+        bool pid_read = false;
+
+        (void)lseek(g_lockfd, 0, SEEK_SET);
+        char pidbuf[64] = {0};
+        ssize_t r = read(g_lockfd, pidbuf, sizeof(pidbuf) - 1);
+        if (r > 0) {
+            pidbuf[r] = '\0';
+            char *endptr = NULL;
+            long v = strtol(pidbuf, &endptr, 10);
+            if (endptr != pidbuf && v > 0 && v <= INT_MAX) {
+                file_pid = (pid_t)v;
+                pid_read = true;
+            }
+        }
+        if (g_is_writer && (!pid_read || file_pid == getpid())) {
+            if (unlink(LOCKFILE_PATH) != 0) {
+                if (errno != ENOENT) {
+                    fprintf(stderr, "Warning: unlink(%s) failed: %s\n", LOCKFILE_PATH, strerror(errno));
+                }
             } else {
                 printf("Writer: removed lockfile %s\n", LOCKFILE_PATH);
             }
+        } else if (g_is_writer) {
+            fprintf(stderr, "Note: not removing %s (owner pid mismatch or unreadable).\n", LOCKFILE_PATH);
         }
+
+        if (flock(g_lockfd, LOCK_UN) != 0) {
+            fprintf(stderr, "Warning: flock(LOCK_UN) failed: %s\n", strerror(errno));
+        }
+        close(g_lockfd);
+        g_lockfd = -1;
     }
 
     exit(code);
 }
+
 
 
 static void signal_handler(int sig) {
