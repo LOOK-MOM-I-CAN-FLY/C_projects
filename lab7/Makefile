@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -std=c11 -O2 -Wall -Wextra -pedantic
+CFLAGS = -std=c11
 TARGET = ipc
 SRC = main.c
 
