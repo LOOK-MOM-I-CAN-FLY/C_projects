@@ -37,13 +37,12 @@ static bool g_is_writer = false;
 static void cleanup_and_exit(int code);
 static void signal_handler(int sig);
 
-/* Sleep for given microseconds using nanosleep (portable, no implicit decl) */
+
 static void sleep_us(long microseconds) {
     struct timespec req;
     req.tv_sec = microseconds / 1000000L;
     req.tv_nsec = (microseconds % 1000000L) * 1000L;
     while (nanosleep(&req, &req) == -1 && errno == EINTR) {
-        /* continue sleeping the remaining time */
     }
 }
 
@@ -175,7 +174,7 @@ static int run_reader(void) {
                 fprintf(stderr, "Reader: shared memory %s not found yet. Waiting for writer to start...\n", SHM_NAME);
             }
             attempts++;
-            sleep_us(200000); /* replaced usleep */
+            sleep_us(200000); 
             continue;
         } else {
             perror("shm_open (reader) failed");
@@ -227,7 +226,7 @@ static int run_reader(void) {
             last_seq = cur_seq;
         }
 
-        sleep_us(100000); /* replaced usleep */
+        sleep_us(100000); 
     }
 
     return 0;
