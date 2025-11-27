@@ -154,7 +154,6 @@ static void fifo_reader(void) {
         exit(EXIT_FAILURE);
     }
     if (r == 0) {
-        /* writer closed with no data; make buffer empty */
         buf[0] = '\0';
         close(fd);
     } else {
