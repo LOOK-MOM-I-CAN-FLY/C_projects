@@ -1,4 +1,4 @@
-#define _POSIX_C_SOURCE 200809L
+//#define _POSIX_C_SOURCE 200809L
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -21,7 +21,6 @@ static void die(const char *msg) {
     exit(EXIT_FAILURE);
 }
 
-
 static void demo_pipe(void) {
     int fds[2];
     if (pipe(fds) == -1) die("pipe");
@@ -30,20 +29,17 @@ static void demo_pipe(void) {
     if (pid == -1) die("fork");
 
     if (pid == 0) {
-
+        /* Child */
         close(fds[1]);
 
         char buf[512];
-        ssize_t n = 0;
         ssize_t r = read(fds[0], buf, sizeof(buf)-1);
         if (r == -1) {
-
             perror("child: read");
             close(fds[0]);
             _exit(EXIT_FAILURE);
         }
         if (r == 0) {
-   
             fprintf(stderr, "child: no data received on pipe\n");
             close(fds[0]);
             _exit(EXIT_FAILURE);
@@ -51,7 +47,6 @@ static void demo_pipe(void) {
         buf[r] = '\0';
         close(fds[0]);
 
-       
         const unsigned int SLEEP_SECONDS = 6;
         sleep(SLEEP_SECONDS);
 
@@ -59,14 +54,13 @@ static void demo_pipe(void) {
         char timestr_child[64];
         format_time(t_child, timestr_child, sizeof(timestr_child));
 
-
         printf("=== PIPE DEMO (child) ===\n");
         printf("Child current time: %s\n", timestr_child);
         printf("Received from parent: %s\n", buf);
         fflush(stdout);
         _exit(EXIT_SUCCESS);
     } else {
-      
+        /* Parent */
         close(fds[0]);
 
         time_t t_parent = time(NULL);
@@ -92,24 +86,21 @@ static void demo_pipe(void) {
         }
         close(fds[1]);
 
-     
         int status = 0;
         if (waitpid(pid, &status, 0) == -1) {
             perror("waitpid");
             exit(EXIT_FAILURE);
         }
         if (WIFEXITED(status)) {
-  
+            /* child exited normally */
         } else {
             fprintf(stderr, "child ended abnormally\n");
         }
     }
 }
 
-
 static const char *make_fifo_path(void) {
     static char path[256];
- 
     snprintf(path, sizeof(path), "/tmp/demo_fifo_%d", (int)getuid());
     return path;
 }
@@ -117,10 +108,8 @@ static const char *make_fifo_path(void) {
 static void fifo_writer(void) {
     const char *fifo = make_fifo_path();
 
-
     if (mkfifo(fifo, 0666) == -1) {
         if (errno != EEXIST) die("mkfifo");
-   
     }
 
     int fd = open(fifo, O_WRONLY);
@@ -153,12 +142,10 @@ static void fifo_writer(void) {
 static void fifo_reader(void) {
     const char *fifo = make_fifo_path();
 
- 
     if (mkfifo(fifo, 0666) == -1) {
         if (errno != EEXIST) die("mkfifo (reader)");
     }
 
-    
     int fd = open(fifo, O_RDONLY);
     if (fd == -1) die("fifo reader: open O_RDONLY");
 
@@ -170,13 +157,13 @@ static void fifo_reader(void) {
         exit(EXIT_FAILURE);
     }
     if (r == 0) {
-        fprintf(stderr, "fifo reader: no data (writer closed?)\n");
+        /* writer closed with no data; make buffer empty */
+        buf[0] = '\0';
         close(fd);
-   
     } else {
         buf[r] = '\0';
+        close(fd);
     }
-    close(fd);
 
     const unsigned int SLEEP_SECONDS = 11;
     sleep(SLEEP_SECONDS);
@@ -190,7 +177,6 @@ static void fifo_reader(void) {
     printf("Received from writer: %s\n", buf);
     fflush(stdout);
 
-
     if (unlink(fifo) == -1) {
         if (errno != ENOENT) {
             perror("unlink fifo");
@@ -201,10 +187,10 @@ static void fifo_reader(void) {
 static void usage(const char *prog) {
     fprintf(stderr,
             "Usage:\n"
-            "  %s pipe          
-            "  %s fifo-writer        
-            "  %s fifo-reader      
-            "\nExamples:\n"
+            "  %s pipe\n"
+            "  %s fifo-writer\n"
+            "  %s fifo-reader\n\n"
+            "Examples:\n"
             "  # pipe demo (single run):\n"
             "  %s pipe\n\n"
             "  # fifo demo (two separate processes):\n"
