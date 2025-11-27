@@ -53,19 +53,17 @@ static void format_timespec(time_t sec, long nsec, char *buf, size_t bufsz) {
         return;
     }
 
-    /* First write the time without milliseconds */
     size_t used = strftime(buf, bufsz, "%Y-%m-%d %H:%M:%S", &tm);
 
-    /* If no space left, ensure NUL termination and return */
     if (used >= bufsz) {
         if (bufsz > 0) buf[bufsz - 1] = '\0';
         return;
     }
 
-    /* Append fractional milliseconds safely into remaining buffer */
     long msec = (long)(nsec / 1000000L);
     snprintf(buf + used, bufsz - used, ".%03ld", msec);
 }
+
 
 static int run_writer(void) {
 
@@ -149,7 +147,6 @@ static int run_writer(void) {
         __atomic_store_n(&g_shm_ptr->tsec, (time_t)ts.tv_sec, __ATOMIC_SEQ_CST);
         __atomic_store_n(&g_shm_ptr->tnsec, (long)ts.tv_nsec, __ATOMIC_SEQ_CST);
 
-        /* copy message safely */
         strncpy(g_shm_ptr->message, msg, MSG_MAX - 1);
         g_shm_ptr->message[MSG_MAX - 1] = '\0';
 
