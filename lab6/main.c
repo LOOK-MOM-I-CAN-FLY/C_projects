@@ -29,7 +29,6 @@ static void demo_pipe(void) {
     if (pid == -1) die("fork");
 
     if (pid == 0) {
-        /* Child */
         close(fds[1]);
 
         char buf[512];
@@ -60,7 +59,6 @@ static void demo_pipe(void) {
         fflush(stdout);
         _exit(EXIT_SUCCESS);
     } else {
-        /* Parent */
         close(fds[0]);
 
         time_t t_parent = time(NULL);
@@ -92,7 +90,6 @@ static void demo_pipe(void) {
             exit(EXIT_FAILURE);
         }
         if (WIFEXITED(status)) {
-            /* child exited normally */
         } else {
             fprintf(stderr, "child ended abnormally\n");
         }
