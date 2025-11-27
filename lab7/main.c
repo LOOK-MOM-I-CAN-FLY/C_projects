@@ -260,7 +260,7 @@ static void cleanup_and_exit(int code) {
             pidbuf[r] = '\0';
             char *endptr = NULL;
             long v = strtol(pidbuf, &endptr, 10);
-            if (endptr != pidbuf && v > 0 && v <= INT_MAX) {
+            if (endptr != pidbuf && v > 0 && v <= 2147483647) {
                 file_pid = (pid_t)v;
                 pid_read = true;
             }
