@@ -1,15 +1,14 @@
 CC = gcc
-CFLAGS = -std=c11 -Wall -Wextra -pthread -g
-SRC = main.c
-TARGET = thread_app
+CFLAGS = -Wall -Wextra -pthread
+TARGET = sync_demo
 
 all: $(TARGET)
 
-$(TARGET): $(SRC)
-	$(CC) $(CFLAGS) $(SRC) -o $(TARGET)
-	@echo "Сборка успешно завершена! Запустите программу командой: ./$(TARGET)"
+$(TARGET): main.c
+	$(CC) $(CFLAGS) -o $(TARGET) main.c
 
 clean:
 	rm -f $(TARGET)
-	@echo "Файлы сборки удалены."
-.PHONY: all clean
+
+run: $(TARGET)
+	./$(TARGET)
