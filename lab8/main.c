@@ -31,7 +31,7 @@ void* writer_thread(void* arg) {
         record_counter++;
         snprintf(shared_buffer, BUFFER_SIZE, "Запись #%d", record_counter);
         
-        printf("\033[0;31m[WRITER]\033[0m  Обновил буфер: %s\n", shared_buffer);
+        printf("\033[0;31m[WRITER     ]\033[0m Обновил буфер: %s\n", shared_buffer);
 
         pthread_mutex_unlock(&mutex);
     }
@@ -50,7 +50,7 @@ void* reader_thread(void* arg) {
         if (record_counter == 0) {
             printf("\033[0;32m[READER %ld]\033[0m (tid: %lu) Буфер пуст\n", my_id, (unsigned long)sys_tid);
         } else {
-            printf("\033[0;32m[READER %ld]\033[0m (tid: %lu) Прочитал: %s\n", my_id, (unsigned long)sys_tid, shared_buffer);
+            printf("\033[0;32m[READER %02ld]\033[0m (tid: %lu) Прочитал: %s\n", my_id, (unsigned long)sys_tid, shared_buffer);
         }
 
         pthread_mutex_unlock(&mutex);
