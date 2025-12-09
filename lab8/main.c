@@ -31,7 +31,7 @@ void* writer_thread(void* arg) {
         record_counter++;
         snprintf(shared_buffer, BUFFER_SIZE, "Запись #%d", record_counter);
         
-        printf("\033[0;31m[WRITER     ]\033[0m Обновил буфер: %s\n", shared_buffer);
+        printf("\033[0;31m[WRITER]\033[0m Обновил буфер: %s\n", shared_buffer);
 
         pthread_mutex_unlock(&mutex);
     }
