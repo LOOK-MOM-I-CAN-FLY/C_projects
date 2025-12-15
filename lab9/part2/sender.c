@@ -37,7 +37,7 @@ int main() {
     arg.val = 1;
     if (semctl(semid, 0, SETVAL, arg) == -1) { perror("semctl"); exit(1); }
 
-    printf("Sender запущен (PID: %d). Пишу данные каждые 3 секунды...\n", getpid());
+    printf("\033[0;31mSender запущен (PID: %d)\033[0m. Пишу данные каждые 3 секунды...\n", getpid());
 
     while(1) {
         if (semop(semid, &lock_res, 1) == -1) { perror("semop lock"); exit(1); }
