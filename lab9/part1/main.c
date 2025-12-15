@@ -12,6 +12,8 @@ sem_t semaphore;
 int counter = 0;
 
 void* writer_thread(void* args) {
+    (void)args;
+
     while (1) {
         sem_wait(&semaphore);
 
@@ -25,7 +27,10 @@ void* writer_thread(void* args) {
     }
     return NULL;
 }
+
 void* reader_thread(void* args) {
+    (void)args;
+
     while (1) {
         sem_wait(&semaphore);
 
@@ -58,7 +63,7 @@ int main() {
 
     pthread_join(t_writer, NULL);
     pthread_join(t_reader, NULL);
-  
+
     sem_destroy(&semaphore);
 
     return 0;
