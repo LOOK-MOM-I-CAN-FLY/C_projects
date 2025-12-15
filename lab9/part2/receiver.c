@@ -27,7 +27,7 @@ int main() {
     int semid = semget(key, 1, 0666);
     if (semid == -1) { perror("semget"); exit(1); }
 
-    printf("Receiver запущен (PID: %d). Читаю данные...\n", getpid());
+    printf("\033[0;32mReceiver запущен (PID: %d)\033[0m. Читаю данные...\n", getpid());
 
     while(1) {
 
