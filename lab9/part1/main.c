@@ -19,7 +19,7 @@ void* writer_thread(void* args) {
 
         counter++;
         snprintf(shared_buffer, BUFFER_SIZE, "Запись №%d", counter);
-        printf("[Writer] Записал: %s\n", shared_buffer);
+        printf("\033[0;31m[Writer]\033[0m Записал: %s\n", shared_buffer);
 
         sem_post(&semaphore);
 
@@ -35,7 +35,7 @@ void* reader_thread(void* args) {
         sem_wait(&semaphore);
 
         pthread_t tid = pthread_self();
-        printf("[Reader TID: %lu] Прочитал: %s\n", (unsigned long)tid, shared_buffer);
+        printf("\033[0;32m[Reader TID: %lu]\033[0m Прочитал: %s\n", (unsigned long)tid, shared_buffer);
 
         sem_post(&semaphore);
 
