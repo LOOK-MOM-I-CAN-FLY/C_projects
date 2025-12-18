@@ -1,10 +1,13 @@
 CC = gcc
-CFLAGS = -Wall -Wextra
+CFLAGS = -Wall -Wextra -pthread
 
-all: main
+TARGET = main
+SRC = main.c
 
-lab9_1: main.c
-	$(CC) $(CFLAGS) main.c -o main -pthread
+all: $(TARGET)
+
+$(TARGET): $(SRC)
+	$(CC) $(CFLAGS) $(SRC) -o $(TARGET)
 
 clean:
-	rm -f main
+	rm -f $(TARGET)
