@@ -21,8 +21,6 @@ void* writer_thread(void* args) {
         snprintf(shared_buffer, BUFFER_SIZE, "Запись №%d", counter);
         printf("\033[0;31m[Writer]\033[0m Записал: %s\n", shared_buffer);
 
-        sem_post(&semaphore);
-
         sleep(1);
     }
     return NULL;
@@ -36,10 +34,6 @@ void* reader_thread(void* args) {
 
         pthread_t tid = pthread_self();
         printf("\033[0;32m[Reader TID: %lu]\033[0m Прочитал: %s\n", (unsigned long)tid, shared_buffer);
-
-        sem_post(&semaphore);
-
-        usleep(500000); 
     }
     return NULL;
 }
@@ -47,7 +41,7 @@ void* reader_thread(void* args) {
 int main() {
     pthread_t t_writer, t_reader;
 
-    if (sem_init(&semaphore, 0, 1) != 0) {
+    if (sem_init(&semaphore, 0, 0) != 0) {
         perror("Ошибка инициализации семафора");
         return 1;
     }
