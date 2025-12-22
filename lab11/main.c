@@ -22,6 +22,7 @@ pthread_cond_t cond_readers = PTHREAD_COND_INITIALIZER;
 pthread_cond_t cond_writer = PTHREAD_COND_INITIALIZER;
 
 void* writer_thread(void* arg) {
+    (void)arg;
     while (keep_running) {
         pthread_mutex_lock(&mutex);
 
