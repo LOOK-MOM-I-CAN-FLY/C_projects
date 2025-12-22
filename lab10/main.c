@@ -19,6 +19,7 @@ int record_counter = 0;
 int keep_running = 1;
 
 void* writer_thread(void* arg) {
+    (void)arg;
     while (keep_running) {
         pthread_rwlock_wrlock(&rwlock);
         record_counter++;
