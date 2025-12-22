@@ -45,7 +45,4 @@ int main() {
 
         sleep(1);
     }
-
-    shmdt(shared_mem);
-    return 0;
 }
