@@ -3,6 +3,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <string.h>
+#include <signal.h> 
 
 #define NUM_READERS 10
 #define BUFFER_SIZE 128
@@ -11,31 +12,41 @@
 #define COLOR_GREEN   "\x1b[32m"
 #define COLOR_RESET   "\x1b[0m"
 
-char shared_array[BUFFER_SIZE] = "Empty";
+char shared_array[BUFFER_SIZE];
 int record_counter = 0;
-int readers_finished = 0;
-int data_ready = 0;
-int keep_running = 1;
+int readers_count = 0;
+int update_pending = 0;
+volatile sig_atomic_t keep_running = 1;
 
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t cond_readers = PTHREAD_COND_INITIALIZER;
-pthread_cond_t cond_writer = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t mutex;
+pthread_cond_t cond_readers;
+pthread_cond_t cond_writer;
+
+void handle_sigint(int sig) {
+    (void)sig;
+    keep_running = 0;
+}
 
 void* writer_thread(void* arg) {
     (void)arg;
     while (keep_running) {
         pthread_mutex_lock(&mutex);
 
-        while (readers_finished < NUM_READERS && record_counter > 0) {
+        while (readers_count < NUM_READERS && record_counter > 0 && keep_running) {
             pthread_cond_wait(&cond_writer, &mutex);
         }
 
+        if (!keep_running) {
+            pthread_mutex_unlock(&mutex);
+            break;
+        }
+
         record_counter++;
-        readers_finished = 0;
-        data_ready = 1;
-        
         snprintf(shared_array, BUFFER_SIZE, "Record ID: %d", record_counter);
-        printf(COLOR_RED "[WRITER] Updated array to: %s" COLOR_RESET "\n", shared_array);
+        printf(COLOR_RED "[WRITER] Обновил данные: %s" COLOR_RESET "\n", shared_array);
+
+        readers_count = 0;
+        update_pending = 1;
 
         pthread_cond_broadcast(&cond_readers);
         pthread_mutex_unlock(&mutex);
@@ -47,22 +58,26 @@ void* writer_thread(void* arg) {
 
 void* reader_thread(void* arg) {
     long tid = (long)arg;
-    int last_read_id = 0;
+    int my_last_read_id = 0;
 
     while (keep_running) {
         pthread_mutex_lock(&mutex);
 
-        while (last_read_id == record_counter || !data_ready) {
+        while ((record_counter == my_last_read_id || !update_pending) && keep_running) {
             pthread_cond_wait(&cond_readers, &mutex);
         }
 
-        printf(COLOR_GREEN "[READER %ld] Current state: %s" COLOR_RESET "\n", tid, shared_array);
-        
-        last_read_id = record_counter;
-        readers_finished++;
+        if (!keep_running) {
+            pthread_mutex_unlock(&mutex);
+            break;
+        }
 
-        if (readers_finished == NUM_READERS) {
-            data_ready = 0;
+        printf(COLOR_GREEN "[READER %ld] Прочитал: %s" COLOR_RESET "\n", tid, shared_array);
+        my_last_read_id = record_counter;
+        readers_count++;
+
+        if (readers_count == NUM_READERS) {
+            update_pending = 0;
             pthread_cond_signal(&cond_writer);
         }
 
@@ -75,27 +90,40 @@ int main() {
     pthread_t readers[NUM_READERS];
     pthread_t writer;
 
-    pthread_create(&writer, NULL, writer_thread, NULL);
+    signal(SIGINT, handle_sigint);
+
+    pthread_mutex_init(&mutex, NULL);
+    pthread_cond_init(&cond_readers, NULL);
+    pthread_cond_init(&cond_writer, NULL);
+
+    printf("--- Программа запущена. Нажмите Ctrl+C для выхода ---\n");
+    fflush(stdout); 
+
+    if (pthread_create(&writer, NULL, writer_thread, NULL) != 0) return 1;
     for (long i = 0; i < NUM_READERS; i++) {
-        pthread_create(&readers[i], NULL, reader_thread, (void*)i);
+        if (pthread_create(&readers[i], NULL, reader_thread, (void*)i) != 0) return 1;
     }
 
-    getchar();
-    keep_running = 0;
+    while (keep_running) {
+        pause(); 
+    }
 
+    printf("\nЗавершение работы... Ожидаем потоки...\n");
+    
     pthread_mutex_lock(&mutex);
-    pthread_cond_broadcast(&cond_readers);
     pthread_cond_broadcast(&cond_writer);
+    pthread_cond_broadcast(&cond_readers);
     pthread_mutex_unlock(&mutex);
 
-    pthread_cancel(writer);
+    pthread_join(writer, NULL);
     for (int i = 0; i < NUM_READERS; i++) {
-        pthread_cancel(readers[i]);
+        pthread_join(readers[i], NULL);
     }
 
     pthread_mutex_destroy(&mutex);
     pthread_cond_destroy(&cond_readers);
     pthread_cond_destroy(&cond_writer);
 
+    printf("Все ресурсы очищены.\n");
     return 0;
 }
